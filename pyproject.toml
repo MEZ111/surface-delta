@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "surface-delta"
+version = "0.1.0"
+description = "Detect security-relevant attack-surface drift between JSONL snapshots."
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+[project.scripts]
+surface-delta = "surface_delta:main"
+
+[tool.setuptools]
+py-modules = ["surface_delta"]
+package-dir = {"" = "src"}

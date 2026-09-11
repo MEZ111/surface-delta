@@ -6,6 +6,8 @@ changed**, not just what a scanner found.
 SurfaceDelta compares two JSONL service snapshots and prioritizes new exposure,
 TLS regressions, public-access changes, and software fingerprint changes. Its
 scoring policy is explicit and deterministic, so every alert can be explained.
+Reports carry SHA-256 digests of both snapshots, tying every decision to the
+exact evidence that produced it.
 
 ## Signals
 
@@ -30,6 +32,7 @@ python3 -m pip install .
 surface-delta tests/before.jsonl tests/after.jsonl -o delta.md
 surface-delta tests/before.jsonl tests/after.jsonl --json
 surface-delta tests/before.jsonl tests/after.jsonl --fail-risk 70
+surface-delta tests/before.jsonl tests/after.jsonl --policy examples/policy.json
 ```
 
 `--fail-risk` makes the command useful as a deployment gate: it exits with code
@@ -49,8 +52,9 @@ One JSON object per service:
 PYTHONPATH=src python3 -m unittest -v tests/test_surface_delta.py
 ```
 
-The tests cover exposed database prioritization, TLS regression detection, and
-invalid input. GitHub Actions installs the command and verifies the full sample.
+Five tests cover exposed database prioritization, TLS regression detection,
+custom policy weights, snapshot provenance, and invalid input. GitHub Actions
+installs the command and verifies the full sample.
 
 ## Boundaries
 

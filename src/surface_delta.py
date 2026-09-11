@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -126,8 +127,12 @@ def compare(old: dict, new: dict, weights: dict[int, int] | None = None) -> list
     return sorted(changes, key=lambda x: (-x.risk, x.asset, x.port))
 
 
-def markdown(changes: list[Change], errors: list[str]) -> str:
-    lines = ["# Surface Delta", "", f"**Changes:** {len(changes)} · **Rejected records:** {len(errors)}", "",
+def markdown(changes: list[Change], errors: list[str], provenance: dict | None = None) -> str:
+    lines = ["# Surface Delta", "", f"**Changes:** {len(changes)} · **Rejected records:** {len(errors)}"]
+    if provenance:
+        lines += ["", f"**Baseline SHA-256:** `{provenance['before_sha256']}`  ",
+                  f"**Candidate SHA-256:** `{provenance['after_sha256']}`"]
+    lines += ["",
              "| Risk | Change | Asset | Port | Reasons |", "| ---: | --- | --- | ---: | --- |"]
     for change in changes:
         reasons = "; ".join(change.reasons).replace("|", "\\|")
@@ -144,15 +149,28 @@ def main() -> int:
     parser.add_argument("after", type=Path)
     parser.add_argument("-o", "--output", type=Path)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--policy", type=Path, help="JSON file containing port_weights overrides")
     parser.add_argument("--fail-risk", type=int, default=101, metavar="SCORE")
     args = parser.parse_args()
+    before_bytes = args.before.read_bytes()
+    after_bytes = args.after.read_bytes()
+    provenance = {"before_sha256": hashlib.sha256(before_bytes).hexdigest(),
+                  "after_sha256": hashlib.sha256(after_bytes).hexdigest()}
     with args.before.open(encoding="utf-8") as file:
         before, before_errors = load_snapshot(file)
     with args.after.open(encoding="utf-8") as file:
         after, after_errors = load_snapshot(file)
     errors = before_errors + after_errors
-    changes = compare(before, after)
-    output = json.dumps({"changes": [asdict(c) for c in changes], "errors": errors}, indent=2) if args.json else markdown(changes, errors)
+    weights = dict(DEFAULT_WEIGHTS)
+    if args.policy:
+        policy = json.loads(args.policy.read_text(encoding="utf-8"))
+        for port, weight in policy.get("port_weights", {}).items():
+            value = int(weight)
+            if not 0 <= value <= 100:
+                raise ValueError(f"invalid risk weight for port {port}")
+            weights[int(port)] = value
+    changes = compare(before, after, weights)
+    output = json.dumps({"provenance": provenance, "changes": [asdict(c) for c in changes], "errors": errors}, indent=2) if args.json else markdown(changes, errors, provenance)
     if args.output:
         args.output.write_text(output, encoding="utf-8")
     else:

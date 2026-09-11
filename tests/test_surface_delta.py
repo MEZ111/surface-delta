@@ -1,7 +1,7 @@
 import unittest
 from dataclasses import replace
 
-from surface_delta import Service, compare, load_snapshot
+from surface_delta import Service, compare, load_snapshot, markdown
 
 
 class SurfaceDeltaTests(unittest.TestCase):
@@ -26,6 +26,17 @@ class SurfaceDeltaTests(unittest.TestCase):
         values, errors = load_snapshot(['{"asset":"x","port":70000}'])
         self.assertEqual(values, {})
         self.assertEqual(len(errors), 1)
+
+    def test_custom_policy_changes_priority(self):
+        service = self.service(port=8443)
+        default = compare({}, {service.key: service})[0]
+        custom = compare({}, {service.key: service}, {8443: 80})[0]
+        self.assertGreater(custom.risk, default.risk)
+
+    def test_report_carries_snapshot_provenance(self):
+        report = markdown([], [], {"before_sha256": "a" * 64, "after_sha256": "b" * 64})
+        self.assertIn("Baseline SHA-256", report)
+        self.assertIn("a" * 64, report)
 
 
 if __name__ == "__main__":
